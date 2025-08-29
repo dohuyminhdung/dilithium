@@ -7,6 +7,7 @@
 #include "randombytes.h"
 #include "symmetric.h"
 #include "fips202.h"
+#include <string.h>
 
 /*************************************************
 * Name:        crypto_sign_keypair
@@ -20,6 +21,17 @@
 *
 * Returns 0 (success)
 **************************************************/
+static const uint8_t xi[32] = {
+        0x00,0x01,0x02,0x03,
+        0x04,0x05,0x06,0x07,
+        0x08,0x09,0x0A,0x0B,
+        0x0C,0x0D,0x0E,0x0F,
+        0x10,0x11,0x12,0x13,
+        0x14,0x15,0x16,0x17,
+        0x18,0x19,0x1A,0x1B,
+        0x1C,0x1D,0x1E,0x1F
+    };
+
 int crypto_sign_keypair(uint8_t *pk, uint8_t *sk) {
   uint8_t seedbuf[2*SEEDBYTES + CRHBYTES];
   uint8_t tr[TRBYTES];
@@ -30,6 +42,51 @@ int crypto_sign_keypair(uint8_t *pk, uint8_t *sk) {
 
   /* Get randomness for rho, rhoprime and key */
   randombytes(seedbuf, SEEDBYTES);
+  seedbuf[SEEDBYTES+0] = K;
+  seedbuf[SEEDBYTES+1] = L;
+  shake256(seedbuf, 2*SEEDBYTES + CRHBYTES, seedbuf, SEEDBYTES+2);
+  rho = seedbuf;
+  rhoprime = rho + SEEDBYTES;
+  key = rhoprime + CRHBYTES;
+
+  /* Expand matrix */
+  polyvec_matrix_expand(mat, rho);
+
+  /* Sample short vectors s1 and s2 */
+  polyvecl_uniform_eta(&s1, rhoprime, 0);
+  polyveck_uniform_eta(&s2, rhoprime, L);
+
+  /* Matrix-vector multiplication */
+  s1hat = s1;
+  polyvecl_ntt(&s1hat);
+  polyvec_matrix_pointwise_montgomery(&t1, mat, &s1hat);
+  polyveck_reduce(&t1);
+  polyveck_invntt_tomont(&t1);
+
+  /* Add error vector s2 */
+  polyveck_add(&t1, &t1, &s2);
+
+  /* Extract t1 and write public key */
+  polyveck_caddq(&t1);
+  polyveck_power2round(&t1, &t0, &t1);
+  pack_pk(pk, rho, &t1);
+
+  /* Compute H(rho, t1) and write secret key */
+  shake256(tr, TRBYTES, pk, CRYPTO_PUBLICKEYBYTES);
+  pack_sk(sk, rho, tr, key, &t0, &s1, &s2);
+
+  return 0;
+}
+
+int crypto_sign_keypair_self_test(uint8_t *pk, uint8_t *sk) {
+  uint8_t seedbuf[2*SEEDBYTES + CRHBYTES];
+  uint8_t tr[TRBYTES];
+  const uint8_t *rho, *rhoprime, *key;
+  polyvecl mat[K];
+  polyvecl s1, s1hat;
+  polyveck s2, t1, t0;
+
+  memcpy(seedbuf, xi, SEEDBYTES);
   seedbuf[SEEDBYTES+0] = K;
   seedbuf[SEEDBYTES+1] = L;
   shake256(seedbuf, 2*SEEDBYTES + CRHBYTES, seedbuf, SEEDBYTES+2);
@@ -224,12 +281,12 @@ int crypto_sign_signature(uint8_t *sig,
   for(i = 0; i < ctxlen; i++)
     pre[2 + i] = ctx[i];
 
-#ifdef DILITHIUM_RANDOMIZED_SIGNING
-  randombytes(rnd, RNDBYTES);
-#else
+// #ifdef DILITHIUM_RANDOMIZED_SIGNING
+//   randombytes(rnd, RNDBYTES);
+// #else
   for(i=0;i<RNDBYTES;i++)
     rnd[i] = 0;
-#endif
+// #endif
 
   crypto_sign_signature_internal(sig,siglen,m,mlen,pre,2+ctxlen,rnd,sk);
   return 0;

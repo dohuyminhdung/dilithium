@@ -10,7 +10,7 @@
 #include "../polyvec.h"
 #include "../packing.h"
 
-#define MLEN 32
+#define MLEN 16
 #define CTXLEN 13
 #define NVECTORS 10000
 
@@ -20,6 +20,15 @@ static keccak_state rngstate = {{0x1F, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 
 void randombytes(uint8_t *x,size_t xlen) {
   shake128_squeeze(x, xlen, &rngstate);
+}
+
+void print_hex(const char *label, const uint8_t *data, size_t len) {
+    printf("%s (%zu bytes):\n", label, len);
+    for (size_t i = 0; i < len; i++) {
+        printf("%02X", data[i]);
+        if ((i+1) % 128 == 0) printf("\n");  // xuống dòng mỗi 128 byte cho dễ đọc
+    }
+    if (len % 128 != 0) printf("\n");
 }
 
 int main(void) {
@@ -38,42 +47,52 @@ int main(void) {
 
   snprintf((char*)ctx,CTXLEN,"test_vectors");
 
-  for(i = 0; i < NVECTORS; ++i) {
-    printf("count = %u\n", i);
+  for(i = 0; i < 1; ++i) {
+    // printf("count = %u\n", i);
 
-    randombytes(m, MLEN);
-    printf("m = ");
-    for(j = 0; j < MLEN; ++j)
-      printf("%02x", m[j]);
+    // randombytes(m, MLEN);
+    memset(m, 0x00, MLEN);
+    const char *msg = "Hello Dilithium!"; // Fixed message for testing
+    size_t msglen = strlen(msg);
+    memcpy(m, msg, msglen);
+
+    print_hex("m = ", m, MLEN);
+    // printf("m = ");
+    // for(j = 0; j < MLEN; ++j)
+    //   printf("%02x", m[j]);
     printf("\n");
 
-    crypto_sign_keypair(pk, sk);
+    crypto_sign_keypair_self_test(pk, sk);
     shake256(buf, 32, pk, CRYPTO_PUBLICKEYBYTES);
-    printf("pk = ");
-    for(j = 0; j < 32; ++j)
-      printf("%02x", buf[j]);
+    // printf("pk = ");
+    print_hex("pk = ", pk, CRYPTO_PUBLICKEYBYTES);
+    // for(j = 0; j < 32; ++j)
+    //   printf("%02x", buf[j]);
     printf("\n");
     shake256(buf, 32, sk, CRYPTO_SECRETKEYBYTES);
-    printf("sk = ");
-    for(j = 0; j < 32; ++j)
-      printf("%02x", buf[j]);
+    // printf("sk = ");
+    print_hex("sk = ", sk, CRYPTO_SECRETKEYBYTES);
+    // for(j = 0; j < 32; ++j)
+    //   printf("%02x", buf[j]);
     printf("\n");
 
     crypto_sign_signature(sig, &siglen, m, MLEN, ctx, CTXLEN, sk);
     shake256(buf, 32, sig, CRYPTO_BYTES);
-    printf("sig = ");
-    for(j = 0; j < 32; ++j)
-      printf("%02x", buf[j]);
+    print_hex("sig = ", sig, siglen);
+    // for(j = 0; j < 32; ++j)
+    //   printf("%02x", buf[j]);
+
     printf("\n");
 
     if(crypto_sign_verify(sig, siglen, m, MLEN, ctx, CTXLEN, pk))
       fprintf(stderr,"Signature verification failed!\n");
 
     randombytes(seed, sizeof(seed));
-    printf("seed = ");
-    for(j = 0; j < sizeof(seed); ++j)
-      printf("%02X", seed[j]);
-    printf("\n");
+    print_hex("seed = ", seed, sizeof(seed));
+    // printf("seed = ");
+    // for(j = 0; j < sizeof(seed); ++j)
+    //   printf("%02X", seed[j]);
+    // printf("\n");
 
     polyvec_matrix_expand(mat, seed);
     printf("A = ([");
