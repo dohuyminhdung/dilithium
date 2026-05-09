@@ -6,9 +6,12 @@
 #include "params.h"
 #include "polyvec.h"
 #include "poly.h"
+#include <time.h>
 
 #define crypto_sign_keypair DILITHIUM_NAMESPACE(keypair)
 int crypto_sign_keypair(uint8_t *pk, uint8_t *sk);
+int crypto_sign_keypair_self_test(uint8_t *pk, uint8_t *sk);
+int crypto_sign_keypair_benchmark(uint8_t *pk, uint8_t *sk, uint8_t *seed, double *elapsed_us);
 
 #define crypto_sign_signature_internal DILITHIUM_NAMESPACE(signature_internal)
 int crypto_sign_signature_internal(uint8_t *sig,
@@ -26,6 +29,11 @@ int crypto_sign_signature(uint8_t *sig, size_t *siglen,
                           const uint8_t *ctx, size_t ctxlen,
                           const uint8_t *sk);
 
+int crypto_sign_signature_benchmark(uint8_t *sig, size_t *siglen,
+                          const uint8_t *m, size_t mlen,
+                          const uint8_t *ctx, size_t ctxlen,
+                          const uint8_t *sk,
+                          uint8_t *msg, double *elapsed_us);
 #define crypto_sign DILITHIUM_NAMESPACETOP
 int crypto_sign(uint8_t *sm, size_t *smlen,
                 const uint8_t *m, size_t mlen,
@@ -46,6 +54,12 @@ int crypto_sign_verify(const uint8_t *sig, size_t siglen,
                        const uint8_t *m, size_t mlen,
                        const uint8_t *ctx, size_t ctxlen,
                        const uint8_t *pk);
+int crypto_sign_verify_benchmark(const uint8_t *sig, size_t siglen,
+                       const uint8_t *m, size_t mlen,
+                       const uint8_t *ctx, size_t ctxlen,
+                       const uint8_t *pk,
+                       uint8_t *msg, double *elapsed_us);
+
 
 #define crypto_sign_open DILITHIUM_NAMESPACE(open)
 int crypto_sign_open(uint8_t *m, size_t *mlen,
